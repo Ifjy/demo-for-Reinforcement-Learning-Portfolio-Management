@@ -1,0 +1,76 @@
+{
+    // 实验设置
+    "experiment_name": "ddpg_multitask_experiment", // 实验名称，用于生成结果文件夹名称
+    "experiment_description": "hs300 data with O policy beta 0.5", // 实验描述，便于记录实验目的和细节
+    // 模式设置
+    "mv_or_not": 2, // 模式选择，2 表示均值-方差模式，1 表示均值模式，0 表示使用折扣模式（gamma = 0.99）
+    // 环境设置
+    "env_name": "PortfolioEnv-v0", // 环境名称，用于创建环境实例
+    "data_path": "/home/psdz/Lin PJ/rlpm/000300.ftr", // 数据文件路径，需包含金融数据
+    // /home/psdz/Lin PJ/rlpm/portfolio_management/dj30/dj30.feather
+    // /home/psdz/Lin PJ/rlpm/000300.ftr
+    // /home/psdz/Lin PJ/rlpm/ddpg_cnn/sp500.feather
+    // /home/psdz/Lin PJ/rlpm/output_feather/data_2011_2013.feather
+    "result_dir": "/home/psdz/Lin PJ/rlpm/ddpg_cnn/resultsave", // 保存实验结果的根目录
+    // 随机性控制
+    "seed": 42, // 随机种子，用于结果的可重复性
+    // 数据集设置
+    "N_stock": 30, // 选择的股票数量  至多70个                              [0,    1,     2,     3,     4,     5,    6,     7,     8,     9,    10,    11,     12,  13]
+    "train_start": 0.0, // 训练集开始位置，0.0 表示从头开始 0.076约为一年长度[0, 0.075, 0.152, 0.228, 0.306, 0.383, 0.46, 0.537, 0.614, 0.691, 0.768, 0.845, 0.922, 0.999]
+    "train_length": 0.7, // 训练数据占比，决定数据集划分                  [[0,   236,  479,   718,   964,  1207,  1449, 1692,  1935, 2178,   2420,  2663,  2906, 3148]]
+    "test_length": 1, // 测试集结束位置，1.0 表示使用剩余所有数据
+    "window_size": 100, // 滑动窗口大小，用于构建时间序列特征
+    "close_pos": 0, // 收盘价位置索引，指定数据中收盘价的位置
+    // 投资组合相关
+    "init_wealth": 1.0, // 初始投资组合财富
+    "portfolio_size": 0.34, // 投资组合大小 最后选择的股票数应该是 int((N_stock+1)*portfolio_size)
+    // 网络更新与训练参数
+    "update_freq": 1, // 网络更新频率，每多少步更新一次网络
+    "eta_update_freq": 200, // eta 更新频率，每多少次update参数后一次更新eta
+    "actor_lr": 1e-6, // Actor 网络的学习率
+    "critic_lr": 1e-6, // Critic 网络的学习率
+    "eta_lr": 0.1, // eta 的学习率
+    "tau": 0.005, // 软更新参数，用于更新目标网络
+    "actor_scheduler_step_size": 1000, // Actor 学习率衰减步长
+    "actor_scheduler_gamma": 0.99, // Actor 学习率衰减率
+    "critic_scheduler_step_size": 1000, // Critic 学习率衰减步长
+    "critic_scheduler_gamma": 0.99, // Critic 学习率衰减率
+    // 风险与奖励设置
+    "transaction_cost": 2e-4, // 交易成本，用于模拟买卖费用
+    "risk_free": 8e-5, // 无风险资产的回报率，用于基准比较
+    "beta": 0.5, // 风险厌恶系数，用于平衡收益和波动的权重
+    "gamma": 1.0, // 折扣因子，用于奖励的时间折扣
+    "value_coef": 0.1, // 值函数的系数，用于控制奖励的影响 AVC constraint
+    "entropy_coef": 1e-5, // 熵损失的系数 注意 原来的actorloss 在 1e-3规格，entropy计算出来在1 左右 所以应该乘1e-4
+    "entropy_loss": 1, // 是否对动作使用熵损失 1 表示使用，0 表示不使用
+    "entropy_disappear_step": 0, // 熵消失步数  用于控制熵损失的衰减
+    // 动作噪声与探索
+    "sigma_decay_rate": 1e-6, // 动作噪声的衰减率，用于探索
+    "sigma": 0.0, // 动作噪声的标准差，用于探索
+    // 网络架构
+    "hidden_size": 512, // Actor 和 Critic 网络的隐藏层节点数
+    "actor_weight_decay": 1e-6, // Actor 网络的权重衰减系数
+    "critic_weight_decay": 1e-6, // Critic 网络的权重衰减系数
+    "use_batch_lsre": 1, // 是否使用批量LSRE，1 表示使用，0 表示不使用   N=20需要10gb显存
+    "use_simple_agent": 0, // 是否使用简单智能体，1 表示使用，0 表示不使用
+    // 注意力机制与嵌入
+    "embed_dim": 100, // 嵌入维度，指定特征嵌入的大小
+    "num_heads": 10, // 注意力机制的头数，用于多头注意力
+    // 经验回放
+    "buffer_size": 100000, // 经验回放缓冲区大小
+    "minimal_size": 1000, // 最小样本数，经验回放开始之前所需的样本量
+    "batch_size": 128, // 批量大小，每次从经验回放中抽取的样本数
+    // 训练与评估
+    "num_episodes": 400, // 训练的总回合数  100个episode差不多20万的更新步
+    "num_update_steps": 8e4, // 训练的总步数  50000个步数
+    "eval_interval": 1, // 评估间隔，每隔多少个回合进行一次评估
+    "eval_episodes": 1, // 评估时使用的回合数
+    // 图像与参数记录
+    "image_interval": 1, // 图像保存间隔，每隔多少个回合保存一次图像
+    "dpi": 600, // 图像保存分辨率，用于生成的图像质量控制
+    "param_record_interval": 500, // 参数记录间隔  更新多少步之后记录一次
+    // 设备设置
+    "device": "cuda", // 计算设备，可设置为 "cuda" 或 "cpu"
+    // 平均奖励计算
+    "avg_len": 10 // 平均奖励长度，用于计算平均奖励的滑动窗口大小
+}
