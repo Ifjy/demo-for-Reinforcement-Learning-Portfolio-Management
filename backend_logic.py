@@ -50,7 +50,7 @@ def load_all_assets(
     if config_main is None:
         return None, None, None, None, None
 
-    device = torch.device(config_main.get("device", "cpu"))
+    device = "cpu"
     config_main["device"] = str(device)
 
     seed_value = config_main.get("seed")
