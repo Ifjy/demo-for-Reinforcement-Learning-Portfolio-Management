@@ -222,33 +222,42 @@ if __name__ == "__main__":
         )
 
         available_stocks = st.session_state.get("stock_names_list", [])
+        # 之前这里是 train_data_numpy，已根据您的代码修正为 test_data_numpy
         test_data_numpy = st.session_state.get("test_data_numpy")
         config_loaded_dict = st.session_state.get("config_loaded_dict", {})
 
         if not available_stocks or test_data_numpy is None:
             st.warning("股票资产尚未加载，无法显示选股信息。")
         else:
-            # --- 新增图表和指标的代码 ---
             with st.spinner("正在生成股票走势图和指标..."):
                 try:
-                    # 从配置中获取收益率所在的特征索引
                     close_pos_index = config_loaded_dict.get("close_pos")
                     if close_pos_index is None:
                         st.error("配置中未找到 'close_pos'，无法计算收益率。")
                     else:
-                        # 提取所有股票在回测期内的阶段收益率
                         returns_df = pd.DataFrame(
-                            train_data_numpy[:, :, close_pos_index],
+                            # 您的代码中是 train_data_numpy，但根据上下文应该是 test_data_numpy
+                            test_data_numpy[:, :, close_pos_index],
                             columns=available_stocks,
                         )
 
-                        # 1. 计算并展示累计收益图
+                        # --- 1. 计算并展示累计收益图 (已优化排序) ---
                         st.subheader("备选股票累计收益走势")
                         cumulative_returns_df = (1 + returns_df).cumprod()
 
-                        # 使用 Plotly 绘制交互式图表
+                        # **【图例排序优化】**
+                        # 1. 获取每个股票的最终累计收益
+                        final_values = cumulative_returns_df.iloc[-1]
+                        # 2. 根据最终收益降序排列，得到新的股票顺序
+                        sorted_stocks_by_value = final_values.sort_values(
+                            ascending=False
+                        ).index
+                        # 3. 按照新的顺序重新排列DataFrame的列
+                        df_for_plot = cumulative_returns_df[sorted_stocks_by_value]
+
                         fig_trends = px.line(
-                            cumulative_returns_df,
+                            # 使用排序后的DataFrame进行绘图
+                            df_for_plot,
                             title="股票累计收益（回测期内）",
                             labels={
                                 "index": "时间步",
@@ -258,12 +267,13 @@ if __name__ == "__main__":
                         )
                         st.plotly_chart(fig_trends, use_container_width=True)
 
-                        # 2. 计算并展示关键指标表格
+                        # --- 2. 计算并展示关键指标表格 (已优化排序) ---
                         st.subheader("关键性能指标")
                         metrics = []
-                        # 假设一年有252个交易日
                         annualization_factor = 252
 
+                        # **【表格排序优化】**
+                        # 在循环中，将指标存为原始的 float 数字，而不是格式化的字符串
                         for stock in available_stocks:
                             stock_returns = returns_df[stock]
                             total_return = cumulative_returns_df[stock].iloc[-1] - 1
@@ -282,29 +292,43 @@ if __name__ == "__main__":
                             metrics.append(
                                 {
                                     "股票": stock,
-                                    "总回报率": f"{total_return:.2%}",
-                                    "年化回报率": f"{annualized_return:.2%}",
-                                    "年化波动率": f"{annualized_volatility:.2%}",
-                                    "夏普比率": f"{sharpe_ratio:.2f}",
+                                    "总回报率": total_return,  # 存储为原始数字
+                                    "年化回报率": annualized_return,  # 存储为原始数字
+                                    "年化波动率": annualized_volatility,  # 存储为原始数字
+                                    "夏普比率": sharpe_ratio,  # 存储为原始数字
                                 }
                             )
 
                         metrics_df = pd.DataFrame(metrics)
-                        st.dataframe(metrics_df, use_container_width=True)
+
+                        # 使用 Styler 对象对数字进行格式化，以供显示，同时保留其数值用于排序
+                        st.dataframe(
+                            metrics_df.style.format(
+                                {
+                                    "总回报率": "{:.2%}",
+                                    "年化回报率": "{:.2%}",
+                                    "年化波动率": "{:.2%}",
+                                    "夏普比率": "{:.2f}",
+                                }
+                            ),
+                            use_container_width=True,
+                        )
 
                 except Exception as e:
                     st.error(f"生成选股信息时出错: {e}")
-        # 使用 st.multiselect 让用户选择
-        user_selection = st.multiselect(
-            label="请选择你的股票 (建议选择5-10支):",
-            options=available_stocks,
-            key="user_selected_stocks",  # 将选择结果存储在 session_state 中
-        )
 
-        if user_selection:
-            st.success(
-                f"你已经选择了 {len(user_selection)} 支股票。点击下方的“运行模拟”按钮开始挑战！"
+            st.markdown("---")
+
+            user_selection = st.multiselect(
+                label="分析完毕后，请在这里选择你的股票 (建议选择5-10支):",
+                options=available_stocks,
+                key="user_selected_stocks",
             )
+
+            if user_selection:
+                st.success(
+                    f"你已经选择了 {len(user_selection)} 支股票。点击下方的“运行模拟”按钮开始挑战！"
+                )
     if st.button("▶️ 运行所有选定模拟", key="run_sim_button"):
         if not st.session_state.assets_loaded:
             st.error("资产未加载。请检查配置和日志。")
