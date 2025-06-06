@@ -105,6 +105,7 @@ if __name__ == "__main__":
                     st.session_state.test_data_numpy,
                     st.session_state.stock_names_list,
                     st.session_state.config_loaded_dict,
+                    st.session_state.train_data_numpy,
                 ) = assets
                 st.session_state.assets_loaded = True
                 st.sidebar.success("✅ 资产加载成功!")
@@ -118,6 +119,7 @@ if __name__ == "__main__":
     stock_names_list = st.session_state.stock_names_list
     config_loaded_dict = st.session_state.config_loaded_dict
     test_data_numpy = st.session_state.test_data_numpy  # For display
+    train_data_numpy = st.session_state.train_data_numpy  # For potential future use
 
     # --- Sidebar: Display Loaded Asset Information ---
     st.sidebar.subheader("ℹ️ 已加载资产信息")
@@ -207,20 +209,88 @@ if __name__ == "__main__":
 
     # --- Main Content Area: Run Simulation and View Results ---
     st.header("🏁 运行模拟并查看结果")
+    # --- Interactive User Strategy Section ---
     with st.expander("👨‍💼 挑战者模式：创建你自己的投资组合", expanded=True):
         st.markdown(
             """
-            从下面的列表中选择你认为在回测期间会表现最好的股票。
-            我们将使用你选择的股票构建一个 **每日等权重** 的投资组合，并与 RL Agent 及其他基准进行比较。
-            """
+        下面是本次回测期间，所有备选股票的独立走势和关键指标。
+        请分析它们，并选择你认为组合起来能表现最好的股票。
+        """
         )
 
-    # 从 session_state 获取已加载的股票列表
-    available_stocks = st.session_state.get("stock_names_list", [])
+        available_stocks = st.session_state.get("stock_names_list", [])
+        test_data_numpy = st.session_state.get("test_data_numpy")
+        config_loaded_dict = st.session_state.get("config_loaded_dict", {})
 
-    if not available_stocks:
-        st.warning("股票资产尚未加载，请先确保侧边栏配置正确。")
-    else:
+        if not available_stocks or test_data_numpy is None:
+            st.warning("股票资产尚未加载，无法显示选股信息。")
+        else:
+            # --- 新增图表和指标的代码 ---
+            with st.spinner("正在生成股票走势图和指标..."):
+                try:
+                    # 从配置中获取收益率所在的特征索引
+                    close_pos_index = config_loaded_dict.get("close_pos")
+                    if close_pos_index is None:
+                        st.error("配置中未找到 'close_pos'，无法计算收益率。")
+                    else:
+                        # 提取所有股票在回测期内的阶段收益率
+                        returns_df = pd.DataFrame(
+                            train_data_numpy[:, :, close_pos_index],
+                            columns=available_stocks,
+                        )
+
+                        # 1. 计算并展示累计收益图
+                        st.subheader("备选股票累计收益走势")
+                        cumulative_returns_df = (1 + returns_df).cumprod()
+
+                        # 使用 Plotly 绘制交互式图表
+                        fig_trends = px.line(
+                            cumulative_returns_df,
+                            title="股票累计收益（回测期内）",
+                            labels={
+                                "index": "时间步",
+                                "value": "累计乘积收益",
+                                "variable": "股票",
+                            },
+                        )
+                        st.plotly_chart(fig_trends, use_container_width=True)
+
+                        # 2. 计算并展示关键指标表格
+                        st.subheader("关键性能指标")
+                        metrics = []
+                        # 假设一年有252个交易日
+                        annualization_factor = 252
+
+                        for stock in available_stocks:
+                            stock_returns = returns_df[stock]
+                            total_return = cumulative_returns_df[stock].iloc[-1] - 1
+                            annualized_return = (1 + total_return) ** (
+                                annualization_factor / len(stock_returns)
+                            ) - 1
+                            annualized_volatility = stock_returns.std() * np.sqrt(
+                                annualization_factor
+                            )
+                            sharpe_ratio = (
+                                annualized_return / annualized_volatility
+                                if annualized_volatility != 0
+                                else 0
+                            )
+
+                            metrics.append(
+                                {
+                                    "股票": stock,
+                                    "总回报率": f"{total_return:.2%}",
+                                    "年化回报率": f"{annualized_return:.2%}",
+                                    "年化波动率": f"{annualized_volatility:.2%}",
+                                    "夏普比率": f"{sharpe_ratio:.2f}",
+                                }
+                            )
+
+                        metrics_df = pd.DataFrame(metrics)
+                        st.dataframe(metrics_df, use_container_width=True)
+
+                except Exception as e:
+                    st.error(f"生成选股信息时出错: {e}")
         # 使用 st.multiselect 让用户选择
         user_selection = st.multiselect(
             label="请选择你的股票 (建议选择5-10支):",
@@ -268,9 +338,14 @@ if __name__ == "__main__":
                 user_stocks = st.session_state.user_selected_stocks
                 sim_runners_config[f"用户精选 ({len(user_stocks)}支)"] = {
                     "runner": run_user_strategy_simulation,
-                    "params": {"selected_stocks": user_stocks},
-                    "run_flag": True,  # 如果用户选了，就必须运行
+                    # 在这里添加一个新的参数 "all_in_env_stock_names"
+                    "params": {
+                        "selected_stocks": user_stocks,
+                        "all_in_env_stock_names": stock_names_list,  # stock_names_list 在主程序中是可用的
+                    },
+                    "run_flag": True,
                 }
+            # --- 新增代码结束 ---
             # Add periodic benchmarks if selected
             if run_buying_winner:
                 sim_runners_config[f"买入赢家 (周期 {holding_period_periodic}天)"] = {

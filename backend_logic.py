@@ -174,7 +174,9 @@ def load_all_assets(
         #     f"Invalid data split indices. T={total_time_steps}, TrainStart={train_start_abs_idx}, TrainEnd={train_end_abs_idx}, TestEnd={test_end_abs_idx}"
         # ) # Removed
         return None, None, None, None, None
-
+    train_data_np = adata_full[
+        train_start_abs_idx:train_end_abs_idx, selected_indices, :
+    ]
     test_data_np = adata_full[train_end_abs_idx:test_end_abs_idx, selected_indices, :]
     if test_data_np.shape[0] == 0:
         st.error("错误：测试数据集为空。请检查数据分割比例和总数据长度。")
@@ -283,7 +285,14 @@ def load_all_assets(
         # logger.error(f"Error initializing Portfolio_Env: {e}", exc_info=True) # Removed
         return None, None, None, None, None
 
-    return agent, test_env, test_data_np, selected_stock_names, config_main
+    return (
+        agent,
+        test_env,
+        test_data_np,
+        selected_stock_names,
+        config_main,
+        train_data_np,
+    )
 
 
 # --- Helper Function: Extract Results from Environment ---
@@ -603,7 +612,7 @@ def run_benchmark_agent_simulation(
     return _extract_simulation_results(env, config, agent_name)
 
 
-def run_user_strategy_simulation(env, config, selected_stocks):
+def run_user_strategy_simulation(env, config, selected_stocks, all_in_env_stock_names):
     """
     为用户选择的股票子集运行一个每日等权重策略的模拟。
     这本质上是一个经过筛选的 EWS 模拟。
@@ -621,7 +630,7 @@ def run_user_strategy_simulation(env, config, selected_stocks):
         - list: Portfolio turnover rates over time.
     """
     # 获取环境中所有股票的名称
-    all_stock_names = env.stock_names
+    all_stock_names = all_in_env_stock_names
 
     # 创建一个权重向量，只为选定的股票分配权重
     num_selected = len(selected_stocks)
@@ -676,7 +685,9 @@ def run_user_strategy_simulation(env, config, selected_stocks):
 
     # 创建权重 DataFrame
     # 权重历史记录的是每个时间步结束后的权重，所以长度应该和日期对应
-    weights_df = pd.DataFrame(weights_history, index=dates[1:], columns=all_stock_names)
+    weights_df = pd.DataFrame(
+        weights_history, index=dates[1:], columns=all_stock_names
+    )  # 这里也可以正确工作了
 
     return portfolio_values_s, weights_df, log_returns_s, turnover_rates
 
