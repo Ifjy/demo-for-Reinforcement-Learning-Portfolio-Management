@@ -613,85 +613,58 @@ def run_benchmark_agent_simulation(
     return _extract_simulation_results(env, config, agent_name)
 
 
-def run_user_strategy_simulation(env, config, selected_stocks, all_in_env_stock_names):
+def run_user_strategy_simulation(
+    env: Porfolio_Env, config: dict, selected_stocks: list, all_in_env_stock_names: list
+):
     """
-    为用户选择的股票子集运行一个每日等权重策略的模拟。
-    这本质上是一个经过筛选的 EWS 模拟。
+    Runs a daily equal-weight simulation for a user-selected subset of stocks.
+
+    This function calculates a fixed weight vector once and applies it at every
+    step of the simulation. It leverages the centralized _extract_simulation_results
+    function to gather the results, ensuring consistency with other strategies.
 
     Args:
         env: The portfolio management environment instance.
         config: The configuration dictionary.
-        selected_stocks (list): A list of stock names selected by the user.
+        selected_stocks: A list of stock names selected by the user.
+        all_in_env_stock_names: A list of all stock names present in the environment.
 
     Returns:
-        A tuple containing:
-        - pd.Series: Portfolio values over time.
-        - pd.DataFrame: Portfolio weights over time.
-        - pd.Series: Portfolio log returns over time.
-        - list: Portfolio turnover rates over time.
+        A tuple containing portfolio values, weights, log returns, and turnover rates,
+        as returned by _extract_simulation_results.
     """
-    # 获取环境中所有股票的名称
-    all_stock_names = all_in_env_stock_names
-
-    # 创建一个权重向量，只为选定的股票分配权重
+    # 1. Calculate the fixed action vector based on user's selection
+    num_total_stocks = len(all_in_env_stock_names)
     num_selected = len(selected_stocks)
-    if num_selected == 0:
-        # 如果没有选择股票，则返回空结果
-        empty_series = pd.Series(dtype=np.float64)
-        empty_df = pd.DataFrame()
-        return empty_series, empty_df, empty_series, []
 
-    # 为每个选定的股票计算等权重
-    equal_weight = 1.0 / num_selected
+    # Action vector includes a position for cash at index 0
+    action = np.zeros(num_total_stocks + 1)
 
-    # 构建一个完整的权重向量，未被选中的股票权重为0
-    # 注意：这里的权重顺序必须和环境中的股票顺序一致
-    action = np.zeros(len(all_stock_names) + 1)
-    # 第一位是cash权重，、
-    for i, stock_name in enumerate(all_stock_names):
-        if stock_name in selected_stocks:
-            action[i + 1] = equal_weight  # 所以i+1是因为cash权重在第0位
+    if num_selected > 0:
+        equal_weight = 1.0 / num_selected
+        # Create a mapping of stock names to their index for efficient lookup
+        stock_to_idx = {name: i for i, name in enumerate(all_in_env_stock_names)}
 
-    # 因为这个策略的权重是固定的，所以我们可以在循环外定义好 action
-    # 注意，action 的第一个元素是现金权重，但在这里我们的简单策略是不保留现金
-    # 假设 action[0] 是现金，但我们的环境设计可能不同，这里我们直接使用股票权重
-    # 根据你的环境设计，可能需要调整。假设环境期望一个只包含股票权重的 action。
-    # 如果环境期望第一个是现金，那么应该是 action_with_cash = np.insert(action, 0, 0.0)
+        for stock_name in selected_stocks:
+            if stock_name in stock_to_idx:
+                # Index in the action vector is stock_index + 1 due to the cash position
+                action_idx = stock_to_idx[stock_name] + 1
+                action[action_idx] = equal_weight
+    else:
+        # If no stocks are selected, hold 100% cash
+        action[0] = 1.0
 
-    obs, info = env.reset()
+    # 2. Run the simulation loop
+    env.reset()
     done = False
+    truncated = False
+    while not done and not truncated:
+        # Apply the same fixed action vector at each time step
+        _, _, done, truncated, _ = env.step(action)
 
-    # 存储结果
-    portfolio_values = [env.init_wealth]
-    portfolio_log_returns = []
-    weights_history = []
-    turnover_rates = []
-
-    while not done:
-        # 在每个时间步都使用相同的、预先计算好的权重向量
-        obs, reward, terminated, truncated, info = env.step(action)
-        done = terminated or truncated
-
-        # 记录数据
-        portfolio_values.append(info["portfolio_value"])
-        portfolio_log_returns.append(info.get("portfolio_log_return", np.nan))
-        weights_history.append(info["portfolio_weights"])
-        turnover_rates.append(info.get("turnover_rate", 0.0))
-
-    # 转换结果为 Pandas DataFrame/Series
-    dates = env.get_date_index()
-    portfolio_values_s = pd.Series(portfolio_values, index=dates, name="User's Pick")
-    log_returns_s = pd.Series(
-        portfolio_log_returns, index=dates[1:], name="User's Pick"
-    )
-
-    # 创建权重 DataFrame
-    # 权重历史记录的是每个时间步结束后的权重，所以长度应该和日期对应
-    weights_df = pd.DataFrame(
-        weights_history, index=dates[1:], columns=all_stock_names
-    )  # 这里也可以正确工作了
-
-    return portfolio_values_s, weights_df, log_returns_s, turnover_rates
+    # 3. Use the centralized helper function to extract results
+    strategy_name = f"用户精选 ({num_selected}支)"
+    return _extract_simulation_results(env, config, strategy_name)
 
 
 # --- Plotting (Matplotlib for Heatmap) ---

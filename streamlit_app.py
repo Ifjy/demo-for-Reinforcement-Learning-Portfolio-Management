@@ -222,11 +222,11 @@ if __name__ == "__main__":
         )
 
         available_stocks = st.session_state.get("stock_names_list", [])
-        # 之前这里是 train_data_numpy，已根据您的代码修正为 test_data_numpy
-        test_data_numpy = st.session_state.get("test_data_numpy")
+        # 使用 train 部分 也就是历史数据 而不是 test 用来查看
+        train_data_numpy = st.session_state.get("train_data_numpy")
         config_loaded_dict = st.session_state.get("config_loaded_dict", {})
 
-        if not available_stocks or test_data_numpy is None:
+        if not available_stocks or train_data_numpy is None:
             st.warning("股票资产尚未加载，无法显示选股信息。")
         else:
             with st.spinner("正在生成股票走势图和指标..."):
@@ -236,8 +236,7 @@ if __name__ == "__main__":
                         st.error("配置中未找到 'close_pos'，无法计算收益率。")
                     else:
                         returns_df = pd.DataFrame(
-                            # 您的代码中是 train_data_numpy，但根据上下文应该是 test_data_numpy
-                            test_data_numpy[:, :, close_pos_index],
+                            train_data_numpy[:, :, close_pos_index],
                             columns=available_stocks,
                         )
 
@@ -368,7 +367,7 @@ if __name__ == "__main__":
                     # 在这里添加一个新的参数 "all_in_env_stock_names"
                     "params": {
                         "selected_stocks": user_stocks,
-                        "all_in_env_stock_names": all_original_stock_names,  # stock_names_list 在主程序中是可用的
+                        "all_in_env_stock_names": stock_names_list,  # stock_names_list 在主程序中是可用的
                     },
                     "run_flag": True,
                 }
