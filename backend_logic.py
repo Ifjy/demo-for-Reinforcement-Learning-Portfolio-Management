@@ -292,6 +292,7 @@ def load_all_assets(
         selected_stock_names,
         config_main,
         train_data_np,
+        all_original_stock_names,
     )
 
 
@@ -645,10 +646,11 @@ def run_user_strategy_simulation(env, config, selected_stocks, all_in_env_stock_
 
     # 构建一个完整的权重向量，未被选中的股票权重为0
     # 注意：这里的权重顺序必须和环境中的股票顺序一致
-    action = np.zeros(len(all_stock_names))
+    action = np.zeros(len(all_stock_names) + 1)
+    # 第一位是cash权重，、
     for i, stock_name in enumerate(all_stock_names):
         if stock_name in selected_stocks:
-            action[i] = equal_weight
+            action[i + 1] = equal_weight  # 所以i+1是因为cash权重在第0位
 
     # 因为这个策略的权重是固定的，所以我们可以在循环外定义好 action
     # 注意，action 的第一个元素是现金权重，但在这里我们的简单策略是不保留现金

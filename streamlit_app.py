@@ -107,6 +107,7 @@ if __name__ == "__main__":
                     st.session_state.stock_names_list,
                     st.session_state.config_loaded_dict,
                     st.session_state.train_data_numpy,
+                    st.session_state.all_original_stock_names,
                 ) = assets
                 st.session_state.assets_loaded = True
                 st.sidebar.success("✅ 资产加载成功!")
@@ -121,6 +122,7 @@ if __name__ == "__main__":
     config_loaded_dict = st.session_state.config_loaded_dict
     test_data_numpy = st.session_state.test_data_numpy  # For display
     train_data_numpy = st.session_state.train_data_numpy  # For potential future use
+    all_original_stock_names = st.session_state.all_original_stock_names
 
     # --- Sidebar: Display Loaded Asset Information ---
     st.sidebar.subheader("ℹ️ 已加载资产信息")
@@ -342,7 +344,7 @@ if __name__ == "__main__":
                     # 在这里添加一个新的参数 "all_in_env_stock_names"
                     "params": {
                         "selected_stocks": user_stocks,
-                        "all_in_env_stock_names": stock_names_list,  # stock_names_list 在主程序中是可用的
+                        "all_in_env_stock_names": all_original_stock_names,  # stock_names_list 在主程序中是可用的
                     },
                     "run_flag": True,
                 }
