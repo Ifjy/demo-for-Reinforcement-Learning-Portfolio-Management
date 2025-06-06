@@ -5,6 +5,7 @@ import numpy as np
 import copy
 import matplotlib.pyplot as plt  # Ensure imported for plt.close()
 from PIL import Image
+import plotly.express as px
 
 # import asyncio # Not used in the provided snippet, can be removed if not needed elsewhere
 from backend_logic import (
