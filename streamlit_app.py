@@ -582,10 +582,18 @@ if __name__ == "__main__":
                 styler.format(format_dict, na_rep="N/A")
                 # 在你的 style_metrics_df 函数中可以增加这个功能
                 styler.highlight_max(
-                    subset=["Sharpe Ratio", "Cumulative Return"], color="lightgreen"
+                    subset=[
+                        "Sharpe Ratio",
+                        "Cumulative Return",
+                        "Annualized Return",
+                        "Sortino Ratio",
+                        "Calmar Ratio",
+                    ],
+                    color="lightgreen",
                 )
                 styler.highlight_min(
-                    subset=["Annualized Volatility (Std)"], color="lightcoral"
+                    subset=["Annualized Volatility (Std)", "Max Drawdown"],
+                    color="lightcoral",
                 )
                 return styler  # 返回 Styler 对象
 
