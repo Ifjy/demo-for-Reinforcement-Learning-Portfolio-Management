@@ -55,7 +55,6 @@ if __name__ == "__main__":
         st.info("点击上方不同的选项卡查看各模块的详细结构。")
 
     with tab2:
-        # 假设你的LSRE图名叫 lsre.png
         st.image(
             "are.png",
             use_container_width=True,
@@ -497,27 +496,6 @@ if __name__ == "__main__":
                                 )
                             )
                         st.success(f"✅ {name} 模拟完成。")
-                        # with st.expander(f"查看 {name} 的结果摘要 (调试用)"):
-                        #     st.write(
-                        #         "投资组合最终价值:",
-                        #         values.iloc[-1] if not values.empty else "N/A",
-                        #     )
-                        #     st.write(
-                        #         "权重 DataFrame (前5行):",
-                        #         (
-                        #             weights_df.head()
-                        #             if not weights_df.empty
-                        #             else "无权重数据"
-                        #         ),
-                        #     )
-                        #     st.write(
-                        #         "对数收益率 (前5行):",
-                        #         (
-                        #             log_returns.head().to_frame()
-                        #             if log_returns is not None and not log_returns.empty
-                        #             else "无收益率数据"
-                        #         ),
-                        #     )
 
                     except Exception as e:
                         st.error(f"❌ {name} 模拟过程中发生错误: {e}")
@@ -530,32 +508,9 @@ if __name__ == "__main__":
                 st.session_state.all_metrics_df = pd.DataFrame()
             st.success("🎉 所有选定模拟均已完成！")
 
-            # Debug for Mean Variance if it ran and stored debug info (from backend_logic potentially)
-            # This assumes backend_logic.py might store such keys if MV has issues.
-            # If not, this section won't show anything.
             mv_debug_keys = sorted(
                 [key for key in st.session_state.keys() if key.startswith("mv_debug_t")]
             )
-            # if mv_debug_keys:
-            #     with st.expander("⚙️ 均值方差策略调试信息 (若有)", collapsed=True):
-            #         key_to_display = None
-            #         for key in reversed(mv_debug_keys):
-            #             if isinstance(st.session_state[key], dict) and (
-            #                 st.session_state[key].get("rebalancing_triggered")
-            #                 or st.session_state[key].get("error")
-            #             ):
-            #                 key_to_display = key
-            #                 break
-            #         if not key_to_display and mv_debug_keys:
-            #             key_to_display = mv_debug_keys[-1]
-
-            #         if key_to_display and key_to_display in st.session_state:
-            #             st.write(
-            #                 f"**时间步 {key_to_display.replace('mv_debug_t', '')} 的调试信息：**"
-            #             )
-            #             st.json(st.session_state[key_to_display])
-            #         else:
-            #             st.info("均值方差策略可能未进行调仓，或未记录特定调试信息。")
 
     # --- Results Display Area ---
     if st.session_state.portfolio_values_to_plot:
@@ -625,7 +580,13 @@ if __name__ == "__main__":
 
                 # 应用格式化，并为 NaN 值指定显示内容
                 styler.format(format_dict, na_rep="N/A")
-
+                # 在你的 style_metrics_df 函数中可以增加这个功能
+                styler.highlight_max(
+                    subset=["Sharpe Ratio", "Cumulative Return"], color="lightgreen"
+                )
+                styler.highlight_min(
+                    subset=["Annualized Volatility (Std)"], color="lightcoral"
+                )
                 return styler  # 返回 Styler 对象
 
             except Exception as e:
