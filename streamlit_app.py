@@ -587,18 +587,14 @@ if __name__ == "__main__":
 
         def style_metrics_df(df_to_style: pd.DataFrame):
             """
-            应用样式到指标 DataFrame：
-            1. 统一居中对齐。
-            2. 根据优劣高亮单元格（绿色）。
-            3. 格式化数字显示，同时保留其原始值用于排序。
+            应用样式到指标 DataFrame（可靠的居中和高亮版本）。
+            通过显式为每个单元格构建样式来避免冲突。
             """
             try:
-                # 复制DataFrame以避免修改原始数据
+                # 0. 准备工作：复制DataFrame，定义列的优劣
                 df_copy = df_to_style.copy()
 
-                # 定义哪些列是越大越好，哪些是越小越好
-                # 注意：这里我们把'Max Drawdown'也归为越小越好，因为它的值是负数，绝对值越小越好。
-                # 'Annualized Turnover Rate' 通常也是越小越好。
+                # 定义哪些列是越大越好
                 max_is_better_cols = [
                     "Cumulative Return",
                     "Annualized Return",
@@ -606,6 +602,7 @@ if __name__ == "__main__":
                     "Sortino Ratio",
                     "Calmar Ratio",
                 ]
+                # 定义哪些列是越小越好 (注意：我们认为波动、回撤、换手率都是越小越好)
                 min_is_better_cols = [
                     "Annualized Volatility (Std)",
                     "Annualized Downside Std",
@@ -614,99 +611,91 @@ if __name__ == "__main__":
                     "Max Drawdown Period",
                 ]
 
-                # 创建 Styler 对象
-                styler = df_copy.style
+                # 1. 创建一个和原数据同样大小的DataFrame，用来存放每个单元格的CSS样式
+                # 首先，给所有单元格一个默认的“居中”样式
+                styles_df = pd.DataFrame(
+                    "", index=df_copy.index, columns=df_copy.columns
+                )
+                styles_df[:] = "text-align: center;"
 
-                # 1. 先应用所有列的数字格式化
-                # --------------------------------
-                format_dict = {}
-                percent_cols = [
-                    "Cumulative Return",
-                    "Annualized Return",
-                    "Annualized Volatility (Std)",
-                    "Annualized Downside Std",
-                    "Max Drawdown",
-                    "Annualized Turnover Rate",
-                ]
-                float_cols = [
-                    "Sharpe Ratio",
-                    "Sortino Ratio",
-                    "Calmar Ratio",
-                    "Skewness",
-                    "Kurtosis",
-                ]
-                int_cols = ["Max Drawdown Period"]
+                # 2. 定义高亮样式（包含居中）
+                highlight_style = "background-color: #d4edda; color: #155724; font-weight: bold; text-align: center;"
 
-                for col in percent_cols:
-                    if col in df_copy.columns:
-                        format_dict[col] = "{:.2%}"
-                for col in float_cols:
-                    if col in df_copy.columns:
-                        format_dict[col] = "{:.2f}"
-                for col in int_cols:
-                    if col in df_copy.columns:
-                        format_dict[col] = lambda x: (
-                            f"{int(x)}" if pd.notnull(x) and np.isfinite(x) else "N/A"
-                        )
-
-                styler.format(format_dict, na_rep="N/A")
-
-                # 2. 定义一个通用的高亮和居中函数
-                # --------------------------------
-                def highlight_and_center(series, mode):
-                    """
-                    根据 series 的最大值或最小值高亮，并对所有单元格居中。
-                    mode: 'max' 或 'min'
-                    """
-                    is_target = (
-                        (series == series.max())
-                        if mode == "max"
-                        else (series == series.min())
-                    )
-
-                    # 返回一个包含CSS样式的列表，长度与Series相同
-                    # 无论是否高亮，都应用 'text-align: center'
-                    return [
-                        (
-                            "background-color: #d4edda; color: #155724; font-weight: bold; text-align: center"
-                            if v
-                            else "text-align: center"
-                        )
-                        for v in is_target
-                    ]
-
-                # 3. 将高亮函数应用到指定的列上
-                # --------------------------------
-                style_dict = {}
+                # 3. 遍历“越大越好”的列，找到最大值并应用高亮样式
                 for col in max_is_better_cols:
                     if col in df_copy.columns:
-                        style_dict[col] = lambda s, mode="max": highlight_and_center(
-                            s, mode
-                        )
+                        try:
+                            # idxmax() 找到最大值所在的索引
+                            idx = df_copy[col].astype(float).idxmax()
+                            styles_df.loc[idx, col] = highlight_style
+                        except (ValueError, TypeError):
+                            # 如果列为空或无法转换为数值，则跳过
+                            pass
 
+                # 4. 遍历“越小越好”的列，找到最小值并应用高亮样式
                 for col in min_is_better_cols:
                     if col in df_copy.columns:
-                        style_dict[col] = lambda s, mode="min": highlight_and_center(
-                            s, mode
-                        )
+                        try:
+                            # idxmin() 找到最小值所在的索引
+                            idx = df_copy[col].astype(float).idxmin()
+                            styles_df.loc[idx, col] = highlight_style
+                        except (ValueError, TypeError):
+                            pass
 
-                # Styler.apply() 接受一个返回样式列表的函数
-                # 我们用一个字典来为不同列指定不同的函数
-                styler.apply(
-                    lambda s: style_dict.get(
-                        s.name, lambda x: ["text-align: center"] * len(s)
-                    )(s),
-                    axis=0,
+                # 5. 创建Styler对象，应用数字格式化，然后应用我们构建好的样式DataFrame
+                styler = df_copy.style
+
+                # 应用数字格式化
+                format_dict = {
+                    **{
+                        col: "{:.2%}"
+                        for col in [
+                            "Cumulative Return",
+                            "Annualized Return",
+                            "Annualized Volatility (Std)",
+                            "Annualized Downside Std",
+                            "Max Drawdown",
+                            "Annualized Turnover Rate",
+                        ]
+                        if col in df_copy.columns
+                    },
+                    **{
+                        col: "{:.2f}"
+                        for col in [
+                            "Sharpe Ratio",
+                            "Sortino Ratio",
+                            "Calmar Ratio",
+                            "Skewness",
+                            "Kurtosis",
+                        ]
+                        if col in df_copy.columns
+                    },
+                    **{
+                        col: (
+                            lambda x: (
+                                f"{int(x)}"
+                                if pd.notnull(x) and np.isfinite(x)
+                                else "N/A"
+                            )
+                        )
+                        for col in ["Max Drawdown Period"]
+                        if col in df_copy.columns
+                    },
+                }
+                styler.format(format_dict, na_rep="N/A")
+
+                # 使用 axis=None 按元素应用样式，并为表头(th)单独设置居中
+                styler.apply(lambda x: styles_df, axis=None)
+                styler.set_table_styles(
+                    [{"selector": "th", "props": [("text-align", "center")]}]
                 )
 
                 return styler
 
             except Exception as e:
                 st.error(f"应用样式时发生错误: {e}")
-                # 如果出错，返回一个基础的、只居中的Styler对象
-                return df_to_style.copy().style.set_properties(
-                    **{"text-align": "center"}
-                )
+                # 如果出错，返回一个基础的Styler对象
+                return df_to_style.copy().style
 
         st.dataframe(
             style_metrics_df(st.session_state.all_metrics_df), use_container_width=False
