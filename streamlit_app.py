@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import copy
 import matplotlib.pyplot as plt  # Ensure imported for plt.close()
+import matplotlib as mpl
+import matplotlib.font_manager as fm
 from PIL import Image
 import plotly.express as px
 
@@ -26,6 +28,8 @@ from backend_logic import (
 )
 
 if __name__ == "__main__":
+    font_path = fm.findfont("Microsoft YaHei")
+    mpl.rcParams["font.family"] = "Microsoft YaHei"
     st.set_page_config(layout="wide", page_title="强化学习投资组合管理演示")
     model_arc = Image.open("model_arc.png")
     col1, col2, col3 = st.columns([1, 2, 1])  # 比例 1:2:1（中间占 50%）
